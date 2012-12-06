@@ -27,7 +27,7 @@ from urllib import urlencode
 class VgtvApi():
 
     API_URL = 'http://api.vgtv.no/api/actions'
-    PER_PAGE = 21
+    PER_PAGE = 40
     plugin = None
     categories = None
 
@@ -89,7 +89,7 @@ class VgtvApi():
         items = list()
         count = 0
         for video in data['videos']:
-            video_url, thumbnail_url = self.get_video_urls(video)
+            video_url, thumbnail_url, category_id = self.get_video_urls(video)
             count += 1
 
             if video_url is None:
@@ -117,19 +117,23 @@ class VgtvApi():
         highest_bitrate = 0
         best_thumb  = {'width': 10000}
         best_format = None
+        category_id = video.get('meta').get('category')
 
         # Some videos do not have a formats array
         if 'formats' not in video and allow_resolve:
-            video_url = self.plugin.url_for('play_video', id=str(video['id']))
+            video_url = self.plugin.url_for('play_id',
+                id=str(video['id']),
+                category=str(category_id)
+            )
             thumb_url = self.build_thumbnail_url({
                 'width': 354,
                 'height': 199
             }, video['id'])
 
-            return video_url, thumb_url
+            return video_url, thumb_url, category_id
         elif 'formats' not in video:
             self.plugin.log.warning('Formats not in video-response')
-            return None, None
+            return None, None, None
 
         # MP4 or m3u8?
         if (allow_resolve):
@@ -160,15 +164,20 @@ class VgtvApi():
         # Fall back if something failed
         if best_format is None:
             self.plugin.log.error('No format found for video %s' % video['id'])
-            return None, None
+            return None, None, None
 
         # If we didn't find a fitting thumb, use thumb from the highest bitrate
         if 'height' not in best_thumb:
             best_thumb = best_format
 
         video_url = self.build_video_url(best_format['paths'][0])
+        video_url = self.plugin.url_for('play_url',
+            url=video_url,
+            category=str(category_id),
+            id=str(video['id'])
+        )
         thumb_url = self.build_thumbnail_url(best_thumb, video['id'])
-        return video_url, thumb_url
+        return video_url, thumb_url, category_id
 
 
     def build_video_url(self, p):
@@ -194,3 +203,13 @@ class VgtvApi():
 
     def get_duration(self, secs):
         return timedelta(seconds=secs)
+
+
+    def track_play(self, id, category=None):
+        drClick  = 'http://drclick.vg.no/drklikkvgtv/register/betalive.php?event=videoplay'
+        drClick += '&identification=' + str(id) + '&text1=vgtv-xbmc'
+
+        if category is not None:
+            drClick += '&text2=' + str(category)
+
+        urllib2.urlopen(drClick)

@@ -100,9 +100,15 @@ def show_category(id, page=1):
     return plugin.finish(categories + items)
 
 @plugin.route('/show/<id>/')
-def play_video(id):
-    resolved_url, thumb_url = vgtv.resolve_video_url(id)
+def play_id(id):
+    resolved_url, thumb_url, category_id = vgtv.resolve_video_url(id)
+    vgtv.track_play(id, category_id)
     return plugin.set_resolved_url(resolved_url)
+
+@plugin.route('/showurl/<url>/<category>/<id>/')
+def play_url(url, category=None, id=None):
+    vgtv.track_play(id, category)
+    return plugin.set_resolved_url(url)
 
 def show_default_video_list(fn, items, page, last_page, query=''):
     page = int(page)
