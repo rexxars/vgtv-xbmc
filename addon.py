@@ -1,0 +1,134 @@
+import os
+from xbmcswift2 import ListItem
+from xbmcswift2 import Plugin
+from resources.lib.api import VgtvApi
+
+STRINGS  = {
+    'plugin_name'  : 30000,
+    'most_recent'  : 30001,
+    'most_viewed'  : 30002,
+    'search'       : 30003,
+    'previous_page': 30004,
+    'next_page'    : 30005,
+}
+
+plugin = Plugin()
+vgtv = VgtvApi(plugin)
+
+RES_PATH = os.path.join(plugin.addon.getAddonInfo('path'), 'resources', 'images', )
+
+@plugin.route('/')
+def index():
+    items = [{
+        'label': _('most_recent'),
+        'thumbnail': os.path.join(RES_PATH, 'latest.png'),
+        'path': plugin.url_for('show_latest', page='1')
+    }, {
+        'label': _('most_viewed'),
+        'thumbnail': os.path.join(RES_PATH, 'mostseen.png'),
+        'path': plugin.url_for('show_most_seen', page='1')
+    }, {
+        'label': _('search'),
+        'thumbnail': os.path.join(RES_PATH, 'search.png'),
+        'path': plugin.url_for('input_search')
+    }]
+
+    plugin.add_items(items)
+    plugin.add_items(build_category_list())
+    return plugin.finish()
+
+@plugin.route('/latest/<page>/')
+def show_latest(page):
+    items, last_page = vgtv.get_default_video_list(
+        url='/videos/published/',
+        page=page
+    )
+    return show_default_video_list('show_latest', items, page, last_page)
+
+@plugin.route('/mostseen/<page>/')
+def show_most_seen(page):
+    items, last_page = vgtv.get_default_video_list(
+        url='/videos/mostseen/',
+        page=page,
+        params={'interval': 'week'}
+    )
+    return show_default_video_list('show_most_seen', items, page, last_page)
+
+@plugin.route('/search/')
+def input_search():
+    query = plugin.keyboard(heading=plugin.get_string(30003))
+
+    if query is None or len(str(query)) == 0:
+        return
+
+    return show_search(1, query);
+
+@plugin.route('/search/<page>/<query>')
+def show_search(page='', query=''):
+    items, last_page = vgtv.get_default_video_list(
+        url='/videos/search/',
+        page=page,
+        params={'query': query}
+    )
+    return show_default_video_list('show_search', items, page, last_page, query)
+
+@plugin.route('/category/<id>/<page>/', options={'page': '1'})
+def show_category(id, page=1):
+    categories = build_category_list(id)
+    items, last_page = vgtv.get_default_video_list(
+        url='/videos/published/',
+        page=page,
+        params={'category': str(id)}
+    )
+    return plugin.finish(categories + items)
+
+@plugin.route('/show/<id>/')
+def play_video(id):
+    resolved_url, thumb_url = vgtv.resolve_video_url(id)
+    return plugin.set_resolved_url(resolved_url)
+
+def show_default_video_list(fn, items, page, last_page, query=''):
+    page = int(page)
+    update_listing = False
+
+    if page > 1:
+        update_listing = True
+
+        items.insert(0, {
+            'label': _('previous_page'),
+            'path' : plugin.url_for(fn, page=str(page - 1), query=query)
+        })
+
+    if (last_page is False):
+        items.append({
+            'label': _('next_page'),
+            'path' : plugin.url_for(fn, page=str(page + 1), query=query)
+        })
+
+    plugin.add_items(items);
+    return plugin.finish(
+        view_mode='thumbnail',
+        update_listing=update_listing
+    )
+
+def build_category_list(root_id=0):
+    categories = vgtv.get_categories(root_id);
+    items = [];
+
+    for category in categories:
+        items.append(ListItem(
+            label=category.get('label'),
+            path=category.get('path')
+        ))
+
+    return items;
+
+# Translation macro
+def _(string):
+    if string in STRINGS:
+        return plugin.get_string(STRINGS[string])
+    else:
+        return string
+
+if __name__ == '__main__':
+    plugin.run()
