@@ -79,7 +79,7 @@ class VgtvApi():
         return matches
 
     def resolve_video_url(self, video_id):
-        url = self.get_api_url(url='/video/', params={'id': video_id});
+        url = self.get_api_url(url='/video/', params={'id': video_id})
         response = urllib2.urlopen(url)
         data = simplejson.loads(response.read())
         return self.get_video_urls(data, allow_resolve=False)
