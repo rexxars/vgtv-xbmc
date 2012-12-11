@@ -19,6 +19,7 @@ import os
 from xbmcswift2 import ListItem
 from xbmcswift2 import Plugin
 from resources.lib.api import VgtvApi
+from xbmcswift2 import xbmcgui
 
 STRINGS  = {
     'plugin_name'  : 30000,
@@ -36,6 +37,7 @@ RES_PATH = os.path.join(plugin.addon.getAddonInfo('path'), 'resources', 'images'
 
 @plugin.route('/')
 def index():
+
     items = [{
         'label': _('most_recent'),
         'thumbnail': os.path.join(RES_PATH, 'latest.png'),
@@ -78,7 +80,7 @@ def input_search():
     if query is None or len(str(query)) == 0:
         return
 
-    return show_search(1, query);
+    return show_search(1, query)
 
 @plugin.route('/search/<page>/<query>')
 def show_search(page='', query=''):
@@ -99,15 +101,15 @@ def show_category(id, page=1):
     )
     return plugin.finish(categories + items)
 
-@plugin.route('/show/<id>/')
-def play_id(id):
+@plugin.route('/show/<id>/<title>/')
+def play_id(id, title=None):
     resolved_url, thumb_url, category_id = vgtv.resolve_video_url(id)
-    vgtv.track_play(id, category_id)
+    track_video_play(id, category_id, title)
     return plugin.set_resolved_url(resolved_url)
 
-@plugin.route('/showurl/<url>/<category>/<id>/')
-def play_url(url, category=None, id=None):
-    vgtv.track_play(id, category)
+@plugin.route('/showurl/<url>/<category>/<id>/<title>/')
+def play_url(url, category=None, id=None, title=None):
+    track_video_play(id, category, title)
     return plugin.set_resolved_url(url)
 
 def show_default_video_list(fn, items, page, last_page, query=''):
@@ -128,15 +130,15 @@ def show_default_video_list(fn, items, page, last_page, query=''):
             'path' : plugin.url_for(fn, page=str(page + 1), query=query)
         })
 
-    plugin.add_items(items);
+    plugin.add_items(items)
     return plugin.finish(
         view_mode='thumbnail',
         update_listing=update_listing
     )
 
 def build_category_list(root_id=0):
-    categories = vgtv.get_categories(root_id);
-    items = [];
+    categories = vgtv.get_categories(root_id)
+    items = []
 
     for category in categories:
         items.append(ListItem(
@@ -144,7 +146,16 @@ def build_category_list(root_id=0):
             path=category.get('path')
         ))
 
-    return items;
+    return items
+
+# Call tracking
+def track_video_play(id, category=None, title=None):
+    vgtv.track_play(
+        id=id,
+        category=category,
+        title=title,
+        resolution=get_resolution()
+    )
 
 # Translation macro
 def _(string):
@@ -152,6 +163,14 @@ def _(string):
         return plugin.get_string(STRINGS[string])
     else:
         return string
+
+# Resolution getter
+def get_resolution():
+    try:
+        win = xbmcgui.Window()
+        return win.getWidth() + 'x' + win.getHeight()
+    except TypeError:
+        return '1920x1080'
 
 if __name__ == '__main__':
     plugin.run()

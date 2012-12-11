@@ -19,20 +19,25 @@
 
 import simplejson
 import urllib2
+import re
 from utils import unescape
 from datetime import datetime
 from datetime import timedelta
 from urllib import urlencode
+from random import random
 
 class VgtvApi():
 
     API_URL = 'http://api.vgtv.no/api/actions'
+    CMS_URL = 'http://cmsapi.vgtv.no'
     PER_PAGE = 40
     plugin = None
     categories = None
+    resolution = None
 
-    def __init__(self, plugin):
-        self.plugin = plugin;
+    def __init__(self, plugin, resolution=None):
+        self.plugin = plugin
+        self.resolution = resolution
 
     def get_api_url(self, url, params={}):
         defaults = {'formats': 'http', 'meta': 1}
@@ -53,7 +58,7 @@ class VgtvApi():
         if self.categories is not None:
             return self.categories
 
-        url = 'http://cmsapi.vgtv.no/categories/drvideo-list'
+        url = self.CMS_URL + '/categories/drvideo-list'
         response = urllib2.urlopen(url)
         data = simplejson.loads(response.read())
         self.categories = data
@@ -62,7 +67,7 @@ class VgtvApi():
     def get_categories(self, root_id=0):
         categories = self.get_category_tree()
 
-        matches = [];
+        matches = []
         for id in categories:
 
             if int(id) < 0:
@@ -118,12 +123,14 @@ class VgtvApi():
         best_thumb  = {'width': 10000}
         best_format = None
         category_id = video.get('meta').get('category')
+        video_title = video.get('meta').get('title', 'no_title')
 
         # Some videos do not have a formats array
         if 'formats' not in video and allow_resolve:
             video_url = self.plugin.url_for('play_id',
                 id=str(video['id']),
-                category=str(category_id)
+                category=str(category_id),
+                title=video_title
             )
             thumb_url = self.build_thumbnail_url({
                 'width': 354,
@@ -174,7 +181,8 @@ class VgtvApi():
         video_url = self.plugin.url_for('play_url',
             url=video_url,
             category=str(category_id),
-            id=str(video['id'])
+            id=str(video['id']),
+            title=video_title
         )
         thumb_url = self.build_thumbnail_url(best_thumb, video['id'])
         return video_url, thumb_url, category_id
@@ -205,11 +213,53 @@ class VgtvApi():
         return timedelta(seconds=secs)
 
 
-    def track_play(self, id, category=None):
-        drClick  = 'http://drclick.vg.no/drklikkvgtv/register/betalive.php?event=videoplay'
-        drClick += '&identification=' + str(id) + '&text1=vgtv-xbmc'
+    def track_play(self, id, category=None, title=None, resolution=None):
+        self.track_play_drclick(id, category)
+        self.track_play_tns(id, category, resolution, title, duration)
+
+    def get_category_path(self, category):
+        url = self.CMS_URL + '/categories/' + str(category)
+        response = urllib2.urlopen(url)
+        data = simplejson.loads(response.read())
+        categoryPath = data.get('categoryPath', None)
+
+        if categoryPath is None:
+            return 'front'
+        else:
+            return '/'.join([p.get('name') for p in categoryPath])
+
+    def track_play_drclick(self, id, category=None):
+        url  = 'http://drclick.vg.no/drklikkvgtv/register/betalive.php?'
+        url += 'event=videoplay&identification=' + str(id) + '&text1=vgtv-xbmc'
 
         if category is not None:
-            drClick += '&text2=' + str(category)
+            url += '&text2=' + str(category)
 
-        urllib2.urlopen(drClick)
+        urllib2.urlopen(url)
+
+    def track_play_tns(self, id, category, resolution, title, duration):
+        res  = resolution.split('x')
+        path = self.get_category_path(category)
+
+        name = 'vgtv/' + path + '/video_' + str(id) + '_' + title
+        name = re.sub(r'\s', r'_', name)
+        name = name.lower()
+        name = name.replace(u'\xe6', u'ae')
+        name = name.replace(u'\xf8', u'oe')
+        name = name.replace(u'\xe5', u'aa')
+        name = re.sub(r'[^A-Za-z\/_0-9\-:()]', r'', name)
+
+        uid  = self.baseN(int(round(random() * 10000000000)), 32)
+
+        url  = 'http://vgstream.tns-cs.net/j0=,,,pl=VGTVplayerXBMC+pv=version1'
+        url += '+sx=' + res[0] + '+sy=' + res[1] + ';+,name=' + name
+        url += '+ct=video+uid=' + uid + '+post=,,0+0,+memlv5;+,1+12+memlv7;;'
+        url += '+dur='
+
+        #+ct=video+uid=2c61o9+pst=,,0+0+memlv5;+,1+12+memlv7;;+dur=1815+vt=217;;;'
+
+    def baseN(self, num, b, numerals='0123456789abcdefghijklmnopqrstuvwxyz'):
+        return ((num == 0) and numerals[0]) or (
+            self.baseN(num // b, b, numerals)
+            .lstrip(numerals[0]) + numerals[num % b])
+
