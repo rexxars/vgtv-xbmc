@@ -113,14 +113,12 @@ def show_category(id, page=1):
 def play_id(id, title=None):
     resolved_url, thumb_url, category_id, duration = vgtv.resolve_video_url(id)
     track_video_play(id, category_id, title, duration)
-    print 'playing (resolved): ' + resolved_url
     return plugin.set_resolved_url(resolved_url)
 
 
 @plugin.route('/showurl/<url>/<category>/<id>/<title>/<duration>/')
 def play_url(url, category=None, id=None, title=None, duration=None):
     track_video_play(id, category, title, duration)
-    print 'playing: ' + url
     return plugin.set_resolved_url(url)
 
 
