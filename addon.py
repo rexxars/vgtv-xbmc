@@ -34,7 +34,11 @@ STRINGS = {
 plugin = Plugin()
 vgtv = VgtvApi(plugin)
 
-RES_PATH = os.path.join(plugin.addon.getAddonInfo('path'), 'resources', 'images', )
+RES_PATH = os.path.join(
+    plugin.addon.getAddonInfo('path'),
+    'resources',
+    'images',
+)
 
 
 @plugin.route('/')
@@ -65,7 +69,7 @@ def show_latest(page):
         url='/videos/published/',
         page=page
     )
-    return show_default_video_list('show_latest', items, page, last_page)
+    return show_video_list('show_latest', items, page, last_page)
 
 
 @plugin.route('/mostseen/<page>/')
@@ -75,12 +79,12 @@ def show_most_seen(page):
         page=page,
         params={'interval': 'week'}
     )
-    return show_default_video_list('show_most_seen', items, page, last_page)
+    return show_video_list('show_most_seen', items, page, last_page)
 
 
 @plugin.route('/search/')
 def input_search():
-    query = plugin.keyboard(heading=plugin.get_string(30003))
+    query = plugin.keyboard(heading=_('search'))
 
     if query is None or len(str(query)) == 0:
         return
@@ -95,7 +99,7 @@ def show_search(page='', query=''):
         page=page,
         params={'query': query}
     )
-    return show_default_video_list('show_search', items, page, last_page, query)
+    return show_video_list('show_search', items, page, last_page, query)
 
 
 @plugin.route('/category/<id>/<page>/', options={'page': '1'})
@@ -122,7 +126,7 @@ def play_url(url, category=None, id=None, title=None, duration=None):
     return plugin.set_resolved_url(url)
 
 
-def show_default_video_list(fn, items, page, last_page, query=''):
+def show_video_list(fn, items, page, last_page, query=''):
     page = int(page)
     update_listing = False
 
