@@ -1,2 +1,2 @@
-[B]1.0.0[/B]
+[B]1.0.1[/B]
 - Initial release
