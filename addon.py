@@ -56,6 +56,10 @@ def index():
         'label': _('search'),
         'thumbnail': os.path.join(RES_PATH, 'search.png'),
         'path': plugin.url_for('input_search')
+    }, {
+        'label': 'Level Up',
+        'thumbnail': os.path.join(RES_PATH, 'level-up.png'),
+        'path': plugin.url_for('show_category', id='147')
     }]
 
     plugin.add_items(items)
