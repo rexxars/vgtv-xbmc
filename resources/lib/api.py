@@ -29,8 +29,7 @@ from random import random
 
 class VgtvApi():
 
-    API_URL = 'http://api.vgtv.no/api/actions'
-    CMS_URL = 'http://cmsapi.vgtv.no'
+    API_URL = 'http://svp.vg.no/svp/api/v1/vgtv'
     PER_PAGE = 40
     plugin = None
     categories = None

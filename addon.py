@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2012-2013 Espen Hovlandsdal
+# Copyright 2012-2016 Espen Hovlandsdal
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,12 +24,17 @@ from xbmcswift2 import xbmcgui
 
 STRINGS = {
     'plugin_name':         30000,
-    'most_recent':         30001,
-    'most_viewed':         30002,
-    'search':              30003,
-    'previous_page':       30004,
-    'next_page':           30005,
-    'remove_from_history': 30006
+    'featured':            30001,
+    'series':              30002,
+    'news':                30003,
+    'documentaries':       30004,
+    'most_seen':           30005,
+    'categories':          30006,
+    'live':                30007,
+    'search':              30008,
+    'previous_page':       30009,
+    'next_page':           30010,
+    'remove_from_history': 30011
 }
 
 plugin = Plugin()
@@ -44,15 +49,29 @@ RES_PATH = os.path.join(
 
 @plugin.route('/')
 def index():
-
     items = [{
-        'label': _('most_recent'),
-        'thumbnail': os.path.join(RES_PATH, 'latest.png'),
-        'path': plugin.url_for('show_latest', page='1')
+        'label': _('featured'),
+        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
+        'path': plugin.url_for('show_featured', page='1')
     }, {
-        'label': _('most_viewed'),
+        'label': _('series'),
+        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
+        'path': plugin.url_for('show_featured', page='1')
+    }, {
+        'label': _('news'),
+        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
+        'path': plugin.url_for('show_featured', page='1')
+    }, {
+        'label': _('documentaries'),
+        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
+        'path': plugin.url_for('show_featured', page='1')
+    }, {
+        'label': _('most_seen'),
         'thumbnail': os.path.join(RES_PATH, 'mostseen.png'),
         'path': plugin.url_for('show_most_seen', page='1')
+    }, {
+        'label': _('categories'),
+        'path': plugin.url_for('show_featured', page='1')
     }, {
         'label': _('search'),
         'thumbnail': os.path.join(RES_PATH, 'search.png'),
@@ -68,8 +87,8 @@ def index():
     return plugin.finish()
 
 
-@plugin.route('/latest/<page>/')
-def show_latest(page):
+@plugin.route('/featured/<page>/')
+def show_featured(page):
     items, last_page = vgtv.get_default_video_list(
         url='/videos/published/',
         page=page
@@ -95,7 +114,7 @@ def show_search_history():
     # If we have no items in the search history, open input
     if (searches is None or len(searches) == 0):
         return input_search()
-    
+
     # Always start with the "new search"-option
     items = [{
         'label': _('search') + '...',
@@ -181,7 +200,7 @@ def remove_from_history(query):
     searches = history.get('items', [])
     searches.remove(query)
     history['items'] = searches
-    
+
     return show_search_history()
 
 

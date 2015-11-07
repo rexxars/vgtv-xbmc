@@ -1,3 +1,6 @@
+[B]3.0.0[/B]
+- Updated plugin to work with new API
+
 [B]2.0.8[/B]
 - Fixed crashing caused by protected, unplayable videos
 
