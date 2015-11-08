@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# VGTV plugin for XBMC
-import os
+# VGTV plugin for Kodi/XBMC
+import os, binascii
 from resources.lib.api import VgtvApi
 from xbmcswift2 import ListItem
 from xbmcswift2 import Plugin
@@ -51,46 +51,45 @@ RES_PATH = os.path.join(
 def index():
     items = [{
         'label': _('featured'),
-        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
+        'thumbnail': os.path.join(RES_PATH, 'icon-featured.png'),
         'path': plugin.url_for('show_featured', page='1')
     }, {
         'label': _('series'),
-        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
-        'path': plugin.url_for('show_featured', page='1')
+        'thumbnail': os.path.join(RES_PATH, 'icon-series.png'),
+        'path': plugin.url_for('show_series')
     }, {
         'label': _('news'),
-        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
-        'path': plugin.url_for('show_featured', page='1')
+        'thumbnail': os.path.join(RES_PATH, 'icon-news.png'),
+        'path': plugin.url_for('show_category', id='1', mode='videos')
     }, {
         'label': _('documentaries'),
-        'thumbnail': os.path.join(RES_PATH, 'featured.png'),
-        'path': plugin.url_for('show_featured', page='1')
+        'thumbnail': os.path.join(RES_PATH, 'icon-documentaries.png'),
+        'path': plugin.url_for('show_category', id='121', mode='videos')
     }, {
         'label': _('most_seen'),
-        'thumbnail': os.path.join(RES_PATH, 'mostseen.png'),
+        'thumbnail': os.path.join(RES_PATH, 'icon-mostseen.png'),
         'path': plugin.url_for('show_most_seen', page='1')
     }, {
+        'label': 'Level Up',
+        'thumbnail': os.path.join(RES_PATH, 'icon-level-up.png'),
+        'path': plugin.url_for('show_category', id='147', mode='videos')
+    }, {
         'label': _('categories'),
-        'path': plugin.url_for('show_featured', page='1')
+        'path': plugin.url_for('show_category', id='0', mode='categories')
     }, {
         'label': _('search'),
-        'thumbnail': os.path.join(RES_PATH, 'search.png'),
+        'thumbnail': os.path.join(RES_PATH, 'icon-search.png'),
         'path': plugin.url_for('show_search_history')
-    }, {
-        'label': 'Level Up',
-        'thumbnail': os.path.join(RES_PATH, 'level-up.png'),
-        'path': plugin.url_for('show_category', id='147')
     }]
 
     plugin.add_items(items)
-    plugin.add_items(build_category_list())
     return plugin.finish()
 
 
 @plugin.route('/featured/<page>/')
 def show_featured(page):
     items, last_page = vgtv.get_default_video_list(
-        url='/videos/published/',
+        url='/editorial/frontpage/assets',
         page=page
     )
     return show_video_list('show_latest', items, page, last_page)
@@ -99,27 +98,27 @@ def show_featured(page):
 @plugin.route('/mostseen/<page>/')
 def show_most_seen(page):
     items, last_page = vgtv.get_default_video_list(
-        url='/videos/mostseen/',
+        url='/assets/most-seen',
         page=page,
-        params={'interval': 'week'}
+        params={'interval': 'week', 'page': page}
     )
     return show_video_list('show_most_seen', items, page, last_page)
 
 
 @plugin.route('/searchhistory/')
-def show_search_history():
+def show_search_history(skip_input=False):
     history = plugin.get_storage('search_history')
     searches = history.get('items', [])
 
     # If we have no items in the search history, open input
-    if (searches is None or len(searches) == 0):
+    if (skip_input is False and len(searches) == 0):
         return input_search()
 
     # Always start with the "new search"-option
     items = [{
         'label': _('search') + '...',
         'path': plugin.url_for('input_search'),
-        'thumbnail': os.path.join(RES_PATH, 'search.png'),
+        'thumbnail': os.path.join(RES_PATH, 'icon-search.png'),
     }]
 
     # Loop and add queries from history
@@ -127,7 +126,7 @@ def show_search_history():
         items.append({
             'label': search,
             'path': plugin.url_for('show_search', page='1', query=search),
-            'thumbnail': os.path.join(RES_PATH, 'search.png'),
+            'thumbnail': os.path.join(RES_PATH, 'icon-search.png'),
             'context_menu': [
                 make_remove_from_history_context_item(search)
             ]
@@ -146,9 +145,18 @@ def input_search():
     if query is None or len(str(query)) == 0:
         return
 
-    # Store search in history
+    # Lowercase the search to normalize history
+    query = query.lower()
+
+    # Load the search history
     history = plugin.get_storage('search_history')
     searches = history.get('items', [])
+
+    # Remove any previous occurency of the item in history
+    if query in searches:
+        searches.remove(query)
+
+    # Insert the query to history
     searches.insert(0, query)
 
     # Have we reached or history limit?
@@ -164,30 +172,40 @@ def input_search():
 @plugin.route('/search/<page>/<query>')
 def show_search(page='', query=''):
     items, last_page = vgtv.get_default_video_list(
-        url='/videos/search/',
+        url='/search',
         page=page,
         params={'query': query}
     )
     return show_video_list('show_search', items, page, last_page, query)
 
+@plugin.route('/series/<page>', options={'page': '1'})
+def show_series(page=1):
+    categories = vgtv.get_series()
+    items = []
 
-@plugin.route('/category/<id>/<page>/', options={'page': '1'})
-def show_category(id, page=1):
-    categories = build_category_list(id)
-    items, last_page = vgtv.get_default_video_list(
-        url='/videos/published/',
-        page=page,
-        params={'category': str(id)}
-    )
-    return plugin.finish(categories + items)
+    for category in categories:
+        items.append(ListItem(
+            label=category.get('label'),
+            path=category.get('path')
+        ))
 
+    return items
 
-@plugin.route('/show/<id>/<title>/')
-def play_id(id, title=None):
-    resolved_url, thumb_url, category_id, duration = vgtv.resolve_video_url(id)
-    track_video_play(id, category_id, title, duration)
-    return plugin.set_resolved_url(resolved_url)
+@plugin.route('/category/<id>/<page>/<mode>/', options={'page': '1'})
+def show_category(id, page=1, mode='all'):
+    categories = list()
+    videos = list()
+    
+    if mode == 'categories' or mode == 'all':
+        categories = build_category_list(id)
 
+    if mode == 'videos' or mode == 'all':
+        videos, last_page = vgtv.get_default_video_list(
+            url='/categories/' + id + '/assets',
+            page=page
+        )
+
+    return plugin.finish(categories + videos)
 
 @plugin.route('/showurl/<url>/<category>/<id>/<title>/<duration>/')
 def play_url(url, category=None, id=None, title=None, duration=None):
@@ -201,7 +219,7 @@ def remove_from_history(query):
     searches.remove(query)
     history['items'] = searches
 
-    return show_search_history()
+    return show_search_history(skip_input=True)
 
 
 def show_video_list(fn, items, page, last_page, query=''):
@@ -253,7 +271,8 @@ def track_video_play(id, category, title, duration):
         category_id=category,
         title=title,
         resolution=get_resolution(),
-        duration=duration
+        duration=duration,
+        uid=get_uid()
     )
 
 
@@ -272,6 +291,17 @@ def get_resolution():
         return win.getWidth() + 'x' + win.getHeight()
     except TypeError:
         return '1920x1080'
+
+# Get some random user ID
+def get_uid():
+    user = plugin.get_storage('user')
+    uid = user.get('uid')
+
+    if uid is None:
+        uid = binascii.b2a_hex(os.urandom(10))
+        user.update({ 'uid': uid })
+
+    return uid
 
 if __name__ == '__main__':
     plugin.run()
